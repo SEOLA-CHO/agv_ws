@@ -186,3 +186,17 @@ The following values must not be guessed:
 - LiDAR roll, pitch and yaw
 - actual VESC Status transmission rates
 - encoder or tachometer scaling
+
+## 12. Team Launch File Contract
+
+Each team-owned ROS package must install the following launch file so that the
+integration package can include it:
+
+- `agv_sim/launch/simulator.launch.py`
+- `agv_odometry/launch/odometry.launch.py`
+- `agv_description/launch/description.launch.py`
+
+The odometry launch accepts `odom_frame` and `base_frame`. The description
+launch accepts `base_frame` and `laser_frame`. Detailed bringup behavior and
+usage remain documented in `src/agv_bringup/README.md` and
+`docs/bringup_design.md`.
