@@ -16,6 +16,16 @@ __pycache__/
 *.swp
 *~
 
+# STM32CubeIDE build output
+Debug/
+Release/
+*.o
+*.d
+*.su
+*.elf
+*.map
+*.list
+
 # OS-generated files
 .DS_Store
 
