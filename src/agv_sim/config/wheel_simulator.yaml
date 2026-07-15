@@ -1,0 +1,8 @@
+wheel_simulator:
+  ros__parameters:
+    publish_rate: 50.0
+    response_alpha: 0.1
+    command_timeout: 0.5
+    max_wheel_speed: 30.0
+    hard_stop_on_timeout: false
+    noise_stddev: 0.0

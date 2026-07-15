@@ -1,0 +1,13 @@
+mecanum_odometry:
+  ros__parameters:
+    wheel_radius: 0.0762
+    wheel_base: 0.40
+    wheel_track: 0.35
+
+    odom_frame: odom
+    base_frame: base_footprint
+    publish_tf: true
+
+    vx_direction: 1.0
+    vy_direction: 1.0
+    wz_direction: -1.0

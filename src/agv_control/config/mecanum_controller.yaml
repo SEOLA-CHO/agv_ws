@@ -1,0 +1,12 @@
+mecanum_controller:
+  ros__parameters:
+    wheel_radius: 0.0762
+
+    wheel_base: 0.40
+    wheel_track: 0.35
+
+    max_wheel_speed: 30.0
+    command_timeout: 0.5
+    publish_rate: 50.0
+
+    rotation_direction: -1.0
