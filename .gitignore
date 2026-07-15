@@ -22,3 +22,19 @@ __pycache__/
 # ROS bag files
 *.bag
 *.db3
+
+# STM32CubeIDE build output
+Debug/
+Release/
+
+# STM32CubeIDE temporary files
+.settings/
+*.launch
+
+# Python test/cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ROS 2 Python package artifacts
+*.egg-info/
