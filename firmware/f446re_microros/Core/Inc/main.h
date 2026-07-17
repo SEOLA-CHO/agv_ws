@@ -67,6 +67,8 @@ extern CAN_HandleTypeDef hcan1;
 #define USART_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
+#define RELAY_Pin GPIO_PIN_8
+#define RELAY_GPIO_Port GPIOA
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14

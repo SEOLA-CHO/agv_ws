@@ -4,6 +4,7 @@
  */
  
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 
 /* Defining MPU_WRAPPERS_INCLUDED_FROM_API_FILE prevents task.h from redefining
@@ -315,13 +316,18 @@ void *pvPortReallocMicroROS( void *pv, size_t xWantedSize )
 void *pvPortCallocMicroROS( size_t num, size_t xWantedSize )
 {
 	vTaskSuspendAll();
-	size_t count = xWantedSize*num;
+	if( ( num != 0U ) && ( xWantedSize > ( SIZE_MAX / num ) ) )
+	{
+		( void ) xTaskResumeAll();
+		return NULL;
+	}
+	size_t count = xWantedSize * num;
 
 	void * mem = pvPortMallocMicroROS(count);
-  	char *in_dest = (char*)mem;
-
-  	while(count--)
-    	*in_dest++ = 0;
+	if( mem != NULL )
+	{
+		memset( mem, 0, count );
+	}
 
 	( void ) xTaskResumeAll();
   	return mem;

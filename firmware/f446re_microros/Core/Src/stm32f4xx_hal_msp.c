@@ -101,6 +101,9 @@ void HAL_CAN_MspInit(CAN_HandleTypeDef* hcan)
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF9_CAN1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(CAN1_RX0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(CAN1_RX0_IRQn);
   }
 }
 
@@ -115,6 +118,7 @@ void HAL_CAN_MspDeInit(CAN_HandleTypeDef* hcan)
   {
     __HAL_RCC_CAN1_CLK_DISABLE();
     HAL_GPIO_DeInit(GPIOB, CAN_RX_Pin | CAN_TX_Pin);
+    HAL_NVIC_DisableIRQ(CAN1_RX0_IRQn);
   }
 }
 

@@ -57,6 +57,7 @@
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_usart2_tx;
 extern DMA_HandleTypeDef hdma_usart2_rx;
+extern CAN_HandleTypeDef hcan1;
 extern UART_HandleTypeDef huart2;
 extern TIM_HandleTypeDef htim1;
 
@@ -161,6 +162,14 @@ void DebugMon_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32f4xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles CAN1 RX0 interrupt.
+  */
+void CAN1_RX0_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&hcan1);
+}
 
 /**
   * @brief This function handles DMA1 stream5 global interrupt.
