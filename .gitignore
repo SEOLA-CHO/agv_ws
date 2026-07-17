@@ -1,22 +1,15 @@
-# ROS 2 colcon build directories
+# ROS 2 colcon outputs
 build/
 install/
 log/
 
-# Python cache
+# Python caches and test artifacts
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+.pytest_cache/
+.coverage
 
-# VS Code
-.vscode/
-
-# IDE and editor files
-.idea/
-*.swp
-*~
-
-# STM32CubeIDE build output
+# STM32CubeIDE outputs
 Debug/
 Release/
 *.o
@@ -26,9 +19,13 @@ Release/
 *.map
 *.list
 
-# OS-generated files
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+*~
 .DS_Store
 
-# ROS bag files
+# ROS bags
 *.bag
 *.db3

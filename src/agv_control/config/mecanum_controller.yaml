@@ -1,0 +1,13 @@
+mecanum_controller:
+  ros__parameters:
+    wheel_radius: 0.0762
+    wheel_base: 0.445
+    wheel_track: 0.400
+
+    # 15000 ERPM / 916.73 ERPM-per-rad/s.
+    max_wheel_speed: 16.36
+    command_timeout: 0.5
+    publish_rate: 50.0
+
+    # Retains the rotation sign verified in the simulation branch.
+    rotation_direction: -1.0
