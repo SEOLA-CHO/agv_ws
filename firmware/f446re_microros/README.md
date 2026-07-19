@@ -1,5 +1,8 @@
 # STM32F446RE micro-ROS wheel controller
 
+For a concise teammate handoff covering library generation, CubeIDE build, and
+ST-LINK flashing, see [`FLASH_HANDOFF.md`](FLASH_HANDOFF.md).
+
 This project is the safety boundary between the ROS 2 wheel controller and four
 VESCs. The STM32 consumes wheel-level commands; it does not subscribe to
 `/cmd_vel` and does not perform mecanum kinematics.
