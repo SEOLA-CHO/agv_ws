@@ -1,5 +1,5 @@
-from glob import glob
 import os
+from glob import glob
 
 from setuptools import find_packages, setup
 
@@ -17,7 +17,7 @@ setup(
             ['resource/' + package_name],
         ),
         (
-            'share/' + package_name,
+            os.path.join('share', package_name),
             ['package.xml'],
         ),
         (
@@ -31,17 +31,13 @@ setup(
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    maintainer='seol',
-    maintainer_email='seol@example.com',
-    description=(
-        'Mecanum wheel odometry publisher using wheel states.'
-    ),
+    maintainer='AXEL',
+    maintainer_email='axel@example.com',
+    description='Mecanum odometry for AXEL AGV',
     license='Apache-2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'mecanum_odometry = '
-            'agv_odom.mecanum_odometry:main',
+            'mecanum_odometry = agv_odom.mecanum_odometry:main',
         ],
     },
 )

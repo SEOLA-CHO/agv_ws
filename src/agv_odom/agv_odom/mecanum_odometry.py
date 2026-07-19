@@ -1,312 +1,331 @@
 #!/usr/bin/env python3
 
 import math
-from typing import Dict, List, Optional
 
 import rclpy
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32MultiArray
+from std_srvs.srv import Empty
 from tf2_ros import TransformBroadcaster
 
 
 class MecanumOdometry(Node):
-    """Calculate mecanum wheel odometry from four wheel velocities."""
 
-    WHEEL_NAMES = [
-        'front_left_wheel',
-        'front_right_wheel',
-        'rear_left_wheel',
-        'rear_right_wheel',
-    ]
-
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__('mecanum_odometry')
 
-        # Robot geometry
-        self.declare_parameter('wheel_radius', 0.0762)
-        self.declare_parameter('wheel_base', 0.40)
-        self.declare_parameter('wheel_track', 0.35)
+        self.declare_parameter('wheel_radius', 0.076)
+        self.declare_parameter('wheelbase_x', 0.380)
+        self.declare_parameter('wheelbase_y', 0.330)
 
-        # Frame and topic settings
+        self.declare_parameter('wheel_state_topic', '/wheel_states')
+        self.declare_parameter('odom_topic', '/odom')
+
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
-        self.declare_parameter('publish_tf', True)
 
-        # Direction corrections
-        self.declare_parameter('vx_direction', 1.0)
-        self.declare_parameter('vy_direction', 1.0)
-        self.declare_parameter('wz_direction', -1.0)
+        self.declare_parameter('front_left_sign', 1.0)
+        self.declare_parameter('front_right_sign', -1.0)
+        self.declare_parameter('rear_left_sign', 1.0)
+        self.declare_parameter('rear_right_sign', -1.0)
+
+        self.declare_parameter('publish_tf', True)
+        self.declare_parameter('update_rate', 50.0)
+        self.declare_parameter('wheel_data_timeout', 0.2)
+        self.declare_parameter('wheel_velocity_deadband', 0.02)
+
+        self.declare_parameter('minimum_dt', 0.001)
+        self.declare_parameter('maximum_dt', 0.1)
+
+        self.declare_parameter('linear_x_scale', 1.0)
+        self.declare_parameter('linear_y_scale', 1.0)
+        self.declare_parameter('angular_z_scale', 1.0)
+
+        self.declare_parameter('initial_x', 0.0)
+        self.declare_parameter('initial_y', 0.0)
+        self.declare_parameter('initial_yaw', 0.0)
 
         self.wheel_radius = float(
             self.get_parameter('wheel_radius').value
         )
-        self.wheel_base = float(
-            self.get_parameter('wheel_base').value
+        self.wheelbase_x = float(
+            self.get_parameter('wheelbase_x').value
         )
-        self.wheel_track = float(
-            self.get_parameter('wheel_track').value
+        self.wheelbase_y = float(
+            self.get_parameter('wheelbase_y').value
         )
 
+        if self.wheel_radius <= 0.0:
+            raise ValueError('wheel_radius must be greater than zero')
+
+        if self.wheelbase_x <= 0.0 or self.wheelbase_y <= 0.0:
+            raise ValueError(
+                'wheelbase_x and wheelbase_y must be greater than zero'
+            )
+
+        self.lx = self.wheelbase_x / 2.0
+        self.ly = self.wheelbase_y / 2.0
+        self.rotation_radius = self.lx + self.ly
+
+        self.wheel_state_topic = str(
+            self.get_parameter('wheel_state_topic').value
+        )
+        self.odom_topic = str(
+            self.get_parameter('odom_topic').value
+        )
         self.odom_frame = str(
             self.get_parameter('odom_frame').value
         )
         self.base_frame = str(
             self.get_parameter('base_frame').value
         )
+
+        self.signs = [
+            float(self.get_parameter('front_left_sign').value),
+            float(self.get_parameter('front_right_sign').value),
+            float(self.get_parameter('rear_left_sign').value),
+            float(self.get_parameter('rear_right_sign').value),
+        ]
+
         self.publish_tf = bool(
             self.get_parameter('publish_tf').value
         )
-
-        self.vx_direction = float(
-            self.get_parameter('vx_direction').value
+        self.update_rate = float(
+            self.get_parameter('update_rate').value
         )
-        self.vy_direction = float(
-            self.get_parameter('vy_direction').value
+        self.timeout = float(
+            self.get_parameter('wheel_data_timeout').value
         )
-        self.wz_direction = float(
-            self.get_parameter('wz_direction').value
+        self.deadband = float(
+            self.get_parameter('wheel_velocity_deadband').value
         )
 
-        if self.wheel_radius <= 0.0:
-            raise ValueError('wheel_radius must be greater than zero')
+        self.minimum_dt = float(
+            self.get_parameter('minimum_dt').value
+        )
+        self.maximum_dt = float(
+            self.get_parameter('maximum_dt').value
+        )
 
-        if self.wheel_base <= 0.0:
-            raise ValueError('wheel_base must be greater than zero')
+        self.linear_x_scale = float(
+            self.get_parameter('linear_x_scale').value
+        )
+        self.linear_y_scale = float(
+            self.get_parameter('linear_y_scale').value
+        )
+        self.angular_z_scale = float(
+            self.get_parameter('angular_z_scale').value
+        )
 
-        if self.wheel_track <= 0.0:
-            raise ValueError('wheel_track must be greater than zero')
+        self.x = float(self.get_parameter('initial_x').value)
+        self.y = float(self.get_parameter('initial_y').value)
+        self.yaw = float(self.get_parameter('initial_yaw').value)
 
-        # Integrated robot pose
-        self.x = 0.0
-        self.y = 0.0
-        self.yaw = 0.0
+        self.raw_wheels = [0.0, 0.0, 0.0, 0.0]
+        self.last_wheel_time = None
+        self.last_update_time = self.get_clock().now()
 
-        self.last_time: Optional[rclpy.time.Time] = None
-
-        self.odom_publisher = self.create_publisher(
+        self.odom_pub = self.create_publisher(
             Odometry,
-            '/odom',
+            self.odom_topic,
             10,
         )
 
-        self.wheel_subscriber = self.create_subscription(
-            JointState,
-            '/wheel_states',
-            self.wheel_state_callback,
+        self.create_subscription(
+            Float32MultiArray,
+            self.wheel_state_topic,
+            self.wheel_callback,
             10,
         )
 
         self.tf_broadcaster = TransformBroadcaster(self)
 
+        self.create_service(
+            Empty,
+            'reset_odom',
+            self.reset_callback,
+        )
+
+        self.create_timer(
+            1.0 / self.update_rate,
+            self.update,
+        )
+
         self.get_logger().info(
-            'Mecanum odometry started: '
-            f'r={self.wheel_radius:.4f} m, '
-            f'wheel_base={self.wheel_base:.3f} m, '
-            f'wheel_track={self.wheel_track:.3f} m, '
-            f'wz_direction={self.wz_direction:.1f}'
+            f'Mecanum odometry started: '
+            f'r={self.wheel_radius}, '
+            f'wheelbase_x={self.wheelbase_x}, '
+            f'wheelbase_y={self.wheelbase_y}'
         )
 
-    def reorder_wheel_velocities(
-        self,
-        msg: JointState,
-    ) -> Optional[List[float]]:
-        """Reorder JointState velocities using wheel names."""
-        if len(msg.name) != len(msg.velocity):
-            self.get_logger().warning(
-                'JointState name and velocity lengths do not match.'
+    def wheel_callback(self, msg):
+        if len(msg.data) < 4:
+            self.get_logger().error(
+                '/wheel_states requires [FL, FR, RL, RR]'
             )
-            return None
-
-        wheel_map: Dict[str, float] = dict(
-            zip(msg.name, msg.velocity)
-        )
-
-        missing = [
-            name
-            for name in self.WHEEL_NAMES
-            if name not in wheel_map
-        ]
-
-        if missing:
-            self.get_logger().warning(
-                f'Missing wheel names: {missing}'
-            )
-            return None
-
-        velocities = [
-            float(wheel_map[name])
-            for name in self.WHEEL_NAMES
-        ]
-
-        if not all(
-            math.isfinite(value)
-            for value in velocities
-        ):
-            self.get_logger().warning(
-                'Non-finite wheel velocity received.'
-            )
-            return None
-
-        return velocities
-
-    def calculate_body_velocity(
-        self,
-        wheel_velocities: List[float],
-    ) -> tuple[float, float, float]:
-        """Convert wheel angular velocities to robot body velocity."""
-        fl, fr, rl, rr = wheel_velocities
-
-        lever_arm = (
-            self.wheel_base / 2.0
-            + self.wheel_track / 2.0
-        )
-
-        vx = (
-            self.wheel_radius
-            / 4.0
-            * (fl + fr + rl + rr)
-        )
-
-        vy = (
-            self.wheel_radius
-            / 4.0
-            * (-fl + fr + rl - rr)
-        )
-
-        wz = (
-            self.wheel_radius
-            / (4.0 * lever_arm)
-            * (-fl + fr - rl + rr)
-        )
-
-        vx *= self.vx_direction
-        vy *= self.vy_direction
-        wz *= self.wz_direction
-
-        return vx, vy, wz
-
-    def wheel_state_callback(
-        self,
-        msg: JointState,
-    ) -> None:
-        """Update pose from wheel velocity measurements."""
-        wheel_velocities = self.reorder_wheel_velocities(msg)
-
-        if wheel_velocities is None:
             return
 
-        current_time = self.get_clock().now()
+        self.raw_wheels = [
+            float(msg.data[0]),
+            float(msg.data[1]),
+            float(msg.data[2]),
+            float(msg.data[3]),
+        ]
 
-        if self.last_time is None:
-            self.last_time = current_time
-            return
+        self.last_wheel_time = self.get_clock().now()
+
+    def reset_callback(self, request, response):
+        del request
+
+        self.x = 0.0
+        self.y = 0.0
+        self.yaw = 0.0
+        self.last_update_time = self.get_clock().now()
+
+        self.get_logger().info('Odometry reset')
+
+        return response
+
+    def corrected_wheels(self, now):
+        if self.last_wheel_time is None:
+            return [0.0, 0.0, 0.0, 0.0]
+
+        age = (
+            now - self.last_wheel_time
+        ).nanoseconds * 1.0e-9
+
+        if age > self.timeout:
+            return [0.0, 0.0, 0.0, 0.0]
+
+        result = []
+
+        for raw_value, sign in zip(self.raw_wheels, self.signs):
+            value = raw_value * sign
+
+            if abs(value) < self.deadband:
+                value = 0.0
+
+            result.append(value)
+
+        return result
+
+    def update(self):
+        now = self.get_clock().now()
 
         dt = (
-            current_time - self.last_time
-        ).nanoseconds / 1e9
+            now - self.last_update_time
+        ).nanoseconds * 1.0e-9
 
-        self.last_time = current_time
+        self.last_update_time = now
 
-        if dt <= 0.0 or dt > 1.0:
-            self.get_logger().warning(
-                f'Invalid odometry time step: {dt:.4f} s'
-            )
+        if dt < self.minimum_dt:
             return
 
-        vx, vy, wz = self.calculate_body_velocity(
-            wheel_velocities
+        if dt > self.maximum_dt:
+            self.publish(now, 0.0, 0.0, 0.0)
+            return
+
+        omega_fl, omega_fr, omega_rl, omega_rr = (
+            self.corrected_wheels(now)
         )
 
-        # Transform body velocity into odom/world coordinates.
-        cos_yaw = math.cos(self.yaw)
-        sin_yaw = math.sin(self.yaw)
+        v_fl = omega_fl * self.wheel_radius
+        v_fr = omega_fr * self.wheel_radius
+        v_rl = omega_rl * self.wheel_radius
+        v_rr = omega_rr * self.wheel_radius
 
-        global_vx = vx * cos_yaw - vy * sin_yaw
-        global_vy = vx * sin_yaw + vy * cos_yaw
+        vx = (
+            v_fl + v_fr + v_rl + v_rr
+        ) / 4.0
 
-        self.x += global_vx * dt
-        self.y += global_vy * dt
-        self.yaw += wz * dt
+        vy = (
+            -v_fl + v_fr + v_rl - v_rr
+        ) / 4.0
+
+        wz = (
+            -v_fl + v_fr - v_rl + v_rr
+        ) / (4.0 * self.rotation_radius)
+
+        vx *= self.linear_x_scale
+        vy *= self.linear_y_scale
+        wz *= self.angular_z_scale
+
+        yaw_mid = self.yaw + 0.5 * wz * dt
+
+        self.x += (
+            vx * math.cos(yaw_mid)
+            - vy * math.sin(yaw_mid)
+        ) * dt
+
+        self.y += (
+            vx * math.sin(yaw_mid)
+            + vy * math.cos(yaw_mid)
+        ) * dt
 
         self.yaw = math.atan2(
-            math.sin(self.yaw),
-            math.cos(self.yaw),
+            math.sin(self.yaw + wz * dt),
+            math.cos(self.yaw + wz * dt),
         )
 
-        self.publish_odometry(
-            current_time,
-            vx,
-            vy,
-            wz,
-        )
+        self.publish(now, vx, vy, wz)
 
-    def publish_odometry(
-        self,
-        stamp,
-        vx: float,
-        vy: float,
-        wz: float,
-    ) -> None:
-        """Publish Odometry message and odom-to-base TF."""
-        half_yaw = self.yaw / 2.0
+    def publish(self, now, vx, vy, wz):
+        qz = math.sin(self.yaw / 2.0)
+        qw = math.cos(self.yaw / 2.0)
 
-        quat_z = math.sin(half_yaw)
-        quat_w = math.cos(half_yaw)
+        msg = Odometry()
 
-        odom_msg = Odometry()
-        odom_msg.header.stamp = stamp.to_msg()
-        odom_msg.header.frame_id = self.odom_frame
-        odom_msg.child_frame_id = self.base_frame
+        msg.header.stamp = now.to_msg()
+        msg.header.frame_id = self.odom_frame
+        msg.child_frame_id = self.base_frame
 
-        odom_msg.pose.pose.position.x = self.x
-        odom_msg.pose.pose.position.y = self.y
-        odom_msg.pose.pose.position.z = 0.0
+        msg.pose.pose.position.x = self.x
+        msg.pose.pose.position.y = self.y
+        msg.pose.pose.orientation.z = qz
+        msg.pose.pose.orientation.w = qw
 
-        odom_msg.pose.pose.orientation.x = 0.0
-        odom_msg.pose.pose.orientation.y = 0.0
-        odom_msg.pose.pose.orientation.z = quat_z
-        odom_msg.pose.pose.orientation.w = quat_w
+        msg.twist.twist.linear.x = vx
+        msg.twist.twist.linear.y = vy
+        msg.twist.twist.angular.z = wz
 
-        odom_msg.twist.twist.linear.x = vx
-        odom_msg.twist.twist.linear.y = vy
-        odom_msg.twist.twist.linear.z = 0.0
+        msg.pose.covariance[0] = 0.02
+        msg.pose.covariance[7] = 0.02
+        msg.pose.covariance[14] = 1000000.0
+        msg.pose.covariance[21] = 1000000.0
+        msg.pose.covariance[28] = 1000000.0
+        msg.pose.covariance[35] = 0.05
 
-        odom_msg.twist.twist.angular.x = 0.0
-        odom_msg.twist.twist.angular.y = 0.0
-        odom_msg.twist.twist.angular.z = wz
+        msg.twist.covariance[0] = 0.02
+        msg.twist.covariance[7] = 0.02
+        msg.twist.covariance[14] = 1000000.0
+        msg.twist.covariance[21] = 1000000.0
+        msg.twist.covariance[28] = 1000000.0
+        msg.twist.covariance[35] = 0.05
 
-        # Temporary covariance values for wheel-only odometry.
-        odom_msg.pose.covariance[0] = 0.02
-        odom_msg.pose.covariance[7] = 0.02
-        odom_msg.pose.covariance[35] = 0.05
+        self.odom_pub.publish(msg)
 
-        odom_msg.twist.covariance[0] = 0.02
-        odom_msg.twist.covariance[7] = 0.02
-        odom_msg.twist.covariance[35] = 0.05
+        if not self.publish_tf:
+            return
 
-        self.odom_publisher.publish(odom_msg)
+        tf_msg = TransformStamped()
 
-        if self.publish_tf:
-            transform = TransformStamped()
-            transform.header.stamp = stamp.to_msg()
-            transform.header.frame_id = self.odom_frame
-            transform.child_frame_id = self.base_frame
+        tf_msg.header.stamp = now.to_msg()
+        tf_msg.header.frame_id = self.odom_frame
+        tf_msg.child_frame_id = self.base_frame
 
-            transform.transform.translation.x = self.x
-            transform.transform.translation.y = self.y
-            transform.transform.translation.z = 0.0
+        tf_msg.transform.translation.x = self.x
+        tf_msg.transform.translation.y = self.y
+        tf_msg.transform.translation.z = 0.0
 
-            transform.transform.rotation.x = 0.0
-            transform.transform.rotation.y = 0.0
-            transform.transform.rotation.z = quat_z
-            transform.transform.rotation.w = quat_w
+        tf_msg.transform.rotation.z = qz
+        tf_msg.transform.rotation.w = qw
 
-            self.tf_broadcaster.sendTransform(transform)
+        self.tf_broadcaster.sendTransform(tf_msg)
 
 
-def main(args=None) -> None:
+def main(args=None):
     rclpy.init(args=args)
 
     node = MecanumOdometry()
@@ -317,7 +336,9 @@ def main(args=None) -> None:
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
