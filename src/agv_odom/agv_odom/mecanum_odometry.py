@@ -6,7 +6,7 @@ import rclpy
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+from sensor_msgs.msg import JointState
 from std_srvs.srv import Empty
 from tf2_ros import TransformBroadcaster
 
@@ -134,7 +134,7 @@ class MecanumOdometry(Node):
         )
 
         self.create_subscription(
-            Float32MultiArray,
+            JointState,
             self.wheel_state_topic,
             self.wheel_callback,
             10,
@@ -161,17 +161,17 @@ class MecanumOdometry(Node):
         )
 
     def wheel_callback(self, msg):
-        if len(msg.data) < 4:
+        if len(msg.velocity) < 4:
             self.get_logger().error(
                 '/wheel_states requires [FL, FR, RL, RR]'
             )
             return
 
         self.raw_wheels = [
-            float(msg.data[0]),
-            float(msg.data[1]),
-            float(msg.data[2]),
-            float(msg.data[3]),
+            float(msg.velocity[0]),
+            float(msg.velocity[1]),
+            float(msg.velocity[2]),
+            float(msg.velocity[3]),
         ]
 
         self.last_wheel_time = self.get_clock().now()
