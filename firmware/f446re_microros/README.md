@@ -164,11 +164,23 @@ Expected outputs:
 
 ```bash
 source /opt/ros/humble/setup.bash
+source ~/agv_ws/install/setup.bash
 source ~/microros_agent_ws/install/local_setup.bash
+export ROS_DOMAIN_ID=0
+unset ROS_NAMESPACE
+
+agent_dev=/dev/serial/by-id/usb-STMicroelectronics_STM32_STLink_066B00353130413143063642-if02
+test -e "$agent_dev"
 
 ros2 run micro_ros_agent micro_ros_agent serial \
-  --dev /dev/ttyACM0 -b 115200 -v6
+  --dev "$agent_dev" -b 115200 -v6
 ```
+
+The firmware creates its XRCE participant in ROS Domain 0. Run the Agent and
+all ROS CLI processes in Domain 0; a CLI left in another domain can make a
+healthy `/base_controller` look as if it disappeared. Use the stable by-id
+path above instead of assuming the current `ttyACM` number, and ensure only one
+Agent or serial terminal has the port open.
 
 ## Test commands
 
@@ -192,8 +204,9 @@ ros2 topic pub --rate 20 --qos-reliability best_effort \
   "{velocity_rad_s: [1.0, 1.0, 1.0, 1.0]}"
 ```
 
-Stop that publisher and verify zero ERPM transmission begins no later than
-300 ms after the last valid sample.
+Stop that publisher and verify measured wheel motion reaches zero no later than
+300 ms after the last valid sample. The firmware watchdog is 100 ms to leave
+margin for task scheduling, VESC status latency, and physical deceleration.
 
 Wheel states:
 

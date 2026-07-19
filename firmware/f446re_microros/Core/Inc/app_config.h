@@ -24,7 +24,9 @@ static const int8_t wheel_directions[WHEEL_COUNT] = {1, -1, 1, -1};
 #define MAX_ABS_ERPM                     15000
 
 #define MOTOR_TASK_PERIOD_MS             20U
-#define WHEEL_COMMAND_TIMEOUT_MS         300U
+/* Leave margin for the 20 ms control task, 50 ms VESC telemetry period,
+   and physical deceleration while guaranteeing a stop within 300 ms. */
+#define WHEEL_COMMAND_TIMEOUT_MS         100U
 #define VESC_TELEMETRY_TIMEOUT_MS        500U
 #define WHEEL_STATE_PUBLISH_PERIOD_MS    50U
 

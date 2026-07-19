@@ -81,8 +81,9 @@ ros2 topic echo /odom
 ```
 
 Stop the `/cmd_vel` publisher and verify that `/wheel_commands` changes to four
-zeros after 0.5 seconds. The STM32 independently applies its 300 ms wheel-command
-timeout if communication with the PC node stops.
+zeros after 0.5 seconds. The STM32 independently applies a 100 ms
+wheel-command watchdog so the 20 ms control loop, VESC telemetry latency, and
+physical deceleration still fit inside the 300 ms stop-safety requirement.
 
 See [`firmware/f446re_microros/README.md`](firmware/f446re_microros/README.md)
 for firmware setup, build, flashing, and test instructions.
