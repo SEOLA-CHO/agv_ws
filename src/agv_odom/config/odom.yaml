@@ -1,0 +1,33 @@
+mecanum_odometry:
+  ros__parameters:
+    wheel_radius: 0.0762
+    wheelbase_x: 0.445
+    wheelbase_y: 0.400
+
+    wheel_state_topic: "/wheel_states"
+    odom_topic: "/odom"
+    odom_frame: "odom"
+    base_frame: "base_footprint"
+
+    # F446 WheelStates is already normalized in [FL, FR, RL, RR] order.
+    front_left_sign: 1.0
+    front_right_sign: 1.0
+    rear_left_sign: 1.0
+    rear_right_sign: 1.0
+    require_all_wheels_online: true
+
+    publish_tf: true
+    update_rate: 50.0
+    wheel_data_timeout: 0.2
+    wheel_velocity_deadband: 0.02
+    minimum_dt: 0.001
+    maximum_dt: 0.1
+
+    linear_x_scale: 1.0
+    linear_y_scale: 1.0
+    # Inverse of agv_control rotation_direction (-1.0).
+    angular_z_scale: -1.0
+
+    initial_x: 0.0
+    initial_y: 0.0
+    initial_yaw: 0.0
