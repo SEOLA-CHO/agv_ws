@@ -10,6 +10,29 @@
 물리 시험처럼 내가 직접 해야 하는 단계에서는 정확히 한 가지 즉시 실행할 작업과
 그 직후 확인할 결과를 알려주고 기다려라.
 
+## 노트북과 STM32의 역할
+
+이 노트북이 AGV의 상위 제어기다. 최종 실물 운용에서는 노트북이 다음 프로세스를
+담당한다.
+
+- micro-ROS Agent
+- `agv_control`: `/cmd_vel -> /wheel_commands`
+- `agv_odom`: `/wheel_states -> /odom` 및 `odom -> base_footprint`
+- LiDAR/센서 driver
+- robot_state_publisher
+- SLAM Toolbox, RViz, 이후 Nav2/상위 명령
+
+STM32F446RE는 하위 실시간 제어기다. STM32는 `/wheel_commands`를 받아 VESC CAN을
+제어하고 `/wheel_states`를 노트북으로 돌려준다. STM32에 `/cmd_vel` 메카넘 계산,
+오도메트리, TF, SLAM을 넣지 마라.
+
+두 운용 모드를 명확히 분리한다.
+
+- 시뮬레이션 모드: 노트북에서 `agv_sim`이 STM32를 대신함
+- 실물 모드: `agv_sim`을 완전히 종료하고 micro-ROS Agent를 통해 STM32를 사용함
+
+`agv_sim`과 STM32가 동시에 `/wheel_states`를 발행하지 않게 하라.
+
 ## 저장소와 기준 브랜치
 
 - 저장소: `https://github.com/SEOLA-CHO/agv_ws.git`
@@ -20,19 +43,45 @@
   checkout의 변경 상태를 먼저 확인하라.
 - 기존 사용자 변경은 절대 덮어쓰지 말고, 작업이 필요하면 별도 통합 브랜치를 만들어라.
 
-노트북의 WSL Ubuntu 터미널에서 다음 형태로 시작하라. 실제 저장 위치는 먼저 찾아서
-확인하고 임의로 가정하지 마라.
+Windows용 펌웨어 checkout과 WSL용 ROS checkout을 분리한다. CubeIDE에서
+`\\wsl$` 경로를 직접 import하거나 WSL native workspace에서 Windows CubeIDE를
+실행하지 마라.
 
-```bash
+- Windows checkout 예시: `C:\AGV\agv_ws`
+  - CubeIDE 프로젝트 import, micro-ROS static library 생성 결과, 펌웨어 빌드에 사용
+- WSL checkout: `~/agv_ws`
+  - colcon, ROS 노드, Agent, SLAM 실행에 사용
+
+두 checkout은 모두 같은 `codex/adapt-sim-odom` 커밋이어야 한다. 서로 다른 checkout의
+수정 내용을 수동 복사하지 말고 Git 커밋으로 동기화하라.
+
+`Windows PowerShell`에서 Windows checkout을 준비한다. `C:\AGV\agv_ws`가 이미
+있다면 다시 clone하지 말고 먼저 `git status`와 remote를 확인하라.
+
+```powershell
+New-Item -ItemType Directory -Force C:\AGV | Out-Null
+Set-Location C:\AGV
 git clone https://github.com/SEOLA-CHO/agv_ws.git
-cd agv_ws
+Set-Location C:\AGV\agv_ws
 git fetch --all --prune
 git switch --track origin/codex/adapt-sim-odom
 git status --short --branch
 git log -1 --oneline
 ```
 
-이미 로컬 브랜치가 있다면 다음을 사용하라.
+`WSL Ubuntu 터미널`에서는 Linux filesystem 안에 별도로 준비한다. 실제 저장 위치는
+먼저 찾아서 확인하고 임의로 가정하지 마라.
+
+```bash
+git clone https://github.com/SEOLA-CHO/agv_ws.git
+cd ~/agv_ws
+git fetch --all --prune
+git switch --track origin/codex/adapt-sim-odom
+git status --short --branch
+git log -1 --oneline
+```
+
+각 checkout에 이미 로컬 브랜치가 있다면 그 checkout 안에서 다음을 사용하라.
 
 ```bash
 git switch codex/adapt-sim-odom
@@ -80,10 +129,39 @@ TF 소유권은 다음과 같다.
 `Windows 관리자 PowerShell`에서 확인:
 
 ```powershell
+git --version
 wsl --status
 wsl --list --verbose
+winget list --id Docker.DockerDesktop
 usbipd list
 ```
+
+WSL/Ubuntu가 없으면 `Windows 관리자 PowerShell`에서 먼저 가능한 배포판을 확인하라.
+
+```powershell
+wsl --list --online
+```
+
+그 결과에 Ubuntu 22.04가 있을 때만 정확한 이름으로 설치하라. 일반적인 명령은
+다음과 같지만 실제 목록을 우선한다.
+
+```powershell
+wsl --install -d Ubuntu-22.04
+```
+
+재부팅이 요구되면 다른 설치를 이어가지 말고 재부팅 후 `wsl --list --verbose`에서
+Ubuntu가 WSL 2인지 확인한다.
+
+Docker Desktop이 없다면 `Windows PowerShell`에서 다음 설치를 사용자 승인 후
+실행하라.
+
+```powershell
+winget install --exact --id Docker.DockerDesktop
+```
+
+설치 후 Docker Desktop을 한 번 직접 실행하고 초기 약관/WSL backend 설정을 마쳐야
+한다. Docker Desktop을 사용할 경우 WSL 안에 별도의 Docker Engine을 중복 설치하지
+마라.
 
 `Docker Desktop 설정 화면`에서 확인:
 
@@ -104,7 +182,83 @@ which rosdep || true
 ROS 2가 없다면 Ubuntu 버전이 22.04인지 확인한 후 공식 ROS 2 Humble 설치 절차를
 사용하라. 기존 apt source와 shell 설정을 보존하고 중복 항목을 만들지 마라.
 
-## 2단계: ROS 패키지 실제 빌드
+STM32CubeIDE가 없으면 ST 공식 설치 프로그램으로 설치해야 한다. 이 다운로드와
+설치 약관/관리자 승인은 사용자에게 한 단계씩 요청하라. 설치 후 다음도 확인한다.
+
+- NUCLEO-F446RE device support
+- STM32CubeF4 firmware package `1.27.1`
+- ST-LINK driver/programmer 접근 가능
+- 영문/공백 없는 새 workspace 경로 사용, 예: `C:\STM32_WS\agv_f446`
+
+## 2단계: Windows checkout과 CubeIDE 프로젝트 복구
+
+펌웨어 프로젝트의 실제 경로는 다음이다.
+
+```text
+C:\AGV\agv_ws\firmware\f446re_microros
+```
+
+이 디렉터리에는 이미 다음 파일이 있으므로 새 STM32 프로젝트를 만들거나 `.ioc`만으로
+프로젝트를 재생성하지 마라.
+
+```text
+.project
+.cproject
+f446re_microros.ioc
+```
+
+`STM32CubeIDE GUI`에서 사용자가 수행할 순서:
+
+1. `File > Switch Workspace > Other...`
+2. 새 workspace로 `C:\STM32_WS\agv_f446` 선택
+3. `File > Import > General > Existing Projects into Workspace`
+4. root directory로 `C:\AGV\agv_ws\firmware\f446re_microros` 선택
+5. 발견된 프로젝트 이름이 정확히 `f446re_microros`인지 확인
+6. `Copy projects into workspace`는 선택하지 않음
+7. import 후 `Properties > Resource > Location`이 위 Git checkout을 가리키는지 확인
+
+프로젝트가 검색되지 않으면 새 프로젝트를 만들지 말고 `.project` 존재 여부, checkout
+브랜치, 경로 길이와 문자를 다시 확인하라. 같은 이름의 오래된 프로젝트가 workspace에
+있으면 어느 복사본이 활성인지 Resource Location으로 확인한 후 사용자에게 선택을
+요청하라.
+
+아직 static library를 재생성하지 않았다면 import 직후 Build/Generate Code를 실행하지
+마라. 특히 `.ioc`를 열었을 때 external changes나 code generation을 요구하더라도 현재
+사용자 코드를 덮어쓸 수 있으므로 먼저 Git 상태와 `USER CODE BEGIN/END` 보존 여부를
+확인한다.
+
+## 3단계: Docker로 CubeIDE checkout의 micro-ROS library 재생성
+
+Docker Desktop과 Ubuntu WSL Integration이 실제로 동작한 뒤, `WSL Ubuntu 터미널`에서
+Windows CubeIDE checkout을 대상으로 실행한다. WSL용 `~/agv_ws`에서 생성하면
+CubeIDE가 사용하는 Windows checkout에는 반영되지 않으므로 경로를 혼동하지 마라.
+
+```bash
+cd /mnt/c/AGV/agv_ws
+git status --short --branch
+git rev-parse --short HEAD
+docker info
+cd firmware/f446re_microros
+bash ./build_microros_library.sh --force
+```
+
+스크립트가 실패하면 기존 library를 보존/복구하도록 구현되어 있으므로 수동으로 vendor
+디렉터리를 삭제하지 마라. 성공 후 반드시 다음을 확인한다.
+
+```bash
+test -f micro_ros_stm32cubemx_utils/microros_static_library_ide/libmicroros/libmicroros.a
+test -f micro_ros_stm32cubemx_utils/microros_static_library_ide/libmicroros/include/agv_msgs/msg/wheel_commands.h
+test -f micro_ros_stm32cubemx_utils/microros_static_library_ide/libmicroros/include/agv_msgs/msg/wheel_states.h
+grep -E 'agv_msgs/(WheelCommands|WheelStates).msg' \
+  micro_ros_stm32cubemx_utils/microros_static_library_ide/libmicroros/available_ros2_types
+```
+
+네 검사가 모두 성공한 후에만 CubeIDE에서 `Release` configuration을 선택하고
+`Project > Clean`, `Project > Build Project`를 실행한다. Console의 실제 종료 결과와
+`Release/f446re_microros.elf` 존재를 확인한다. GUI에서 열려 있는 같은 workspace를
+동시에 headless CLI build하지 마라.
+
+## 4단계: 상위 제어기 ROS 패키지 실제 빌드
 
 `WSL Ubuntu 터미널`에서 실행하라.
 
@@ -136,7 +290,7 @@ colcon test-result --verbose
 - `colcon test-result --verbose`에 실패 없음
 - 정적 Python 테스트만 실행하고 ROS 빌드 성공이라고 보고하지 않음
 
-## 3단계: description 없이 바퀴 파이프라인 검증
+## 5단계: description 없이 상위 제어기 파이프라인 검증
 
 각 터미널에서 공통으로 다음을 실행하라.
 
@@ -218,7 +372,7 @@ ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist \
 부호를 동시에 바꾸지 말고, 입력 명령·바퀴 명령·바퀴 상태·오도메트리 순서로 어느
 경계에서 처음 반전되는지 증거를 잡아 한 변수만 수정하라.
 
-## 4단계: agv_description과 전체 시뮬레이션 통합
+## 6단계: agv_description과 전체 시뮬레이션 통합
 
 현재 `agv_odom/launch/full_sim.launch.py`는 `agv_description`을 요구한다. 원격
 브랜치 중 description/URDF가 있는 브랜치를 먼저 조사하되 현재 브랜치에 통째로
@@ -242,7 +396,7 @@ ros2 run tf2_tools view_frames
 반드시 controller, simulator, odometry가 각각 하나만 실행되는지 확인한다. TF tree에서
 중복 publisher, 끊긴 frame, 좌우/전후가 뒤집힌 wheel joint가 없어야 한다.
 
-## 5단계: SLAM 준비와 실행
+## 7단계: SLAM 준비와 실행
 
 바퀴 시뮬레이터만으로는 `/scan`이 생기지 않으므로 SLAM 성공이라고 판단하지 마라.
 팀 브랜치의 LiDAR driver, Gazebo sensor plugin 또는 검증용 rosbag 중 실제 `/scan`
@@ -271,7 +425,7 @@ SLAM 실행 전 다음 게이트를 모두 통과해야 한다.
 직선, 횡이동, 회전 후 원점 근처 복귀를 저속으로 시험하고 RViz에서 map, scan, TF,
 odom을 함께 확인한다. map 저장까지 실제로 성공해야 SLAM 완료로 보고한다.
 
-## 6단계: 실제 STM32로 전환할 때의 안전 절차
+## 8단계: 상위 제어기 노트북을 실제 STM32에 연결하는 안전 절차
 
 실물 시험은 내가 명시적으로 하드웨어 시험을 시작하겠다고 할 때만 진행하라.
 시뮬레이터와 STM32가 동시에 `/wheel_states`를 발행하지 않게 `agv_sim`을 종료한다.
@@ -290,6 +444,27 @@ odom을 함께 확인한다. map 저장까지 실제로 성공해야 SLAM 완료
 
 USB 장치 경로를 `/dev/ttyACM0`으로 가정하지 마라.
 
+`usbipd`가 없다면 `Windows 관리자 PowerShell`에서 사용자 승인 후 설치하고 재확인한다.
+
+```powershell
+winget install --interactive --exact --id dorssel.usbipd-win
+usbipd list
+```
+
+ST-LINK USB 장치는 CubeIDE와 WSL이 동시에 소유할 수 없다고 가정한다. CubeIDE에서
+flash할 때는 먼저 Windows가 소유하도록 한다.
+
+`Windows 관리자 PowerShell`:
+
+```powershell
+usbipd list
+usbipd detach --busid <실제_BUSID>
+```
+
+그 상태에서 CubeIDE의 `Run > Run As > STM32 C/C++ Application` 또는 ST-LINK
+programming을 수행하고 program/verify 결과를 확인한다. flash가 끝난 뒤 debug 세션과
+ST-LINK를 사용하는 Windows 프로그램을 종료한 다음에만 WSL로 넘긴다.
+
 `Windows 관리자 PowerShell`:
 
 ```powershell
@@ -304,6 +479,77 @@ usbipd attach --wsl --busid <실제_BUSID>
 lsusb
 ls -l /dev/ttyACM* 2>/dev/null || true
 ls -l /dev/serial/by-id/ 2>/dev/null || true
+```
+
+권한 오류가 있을 때만 실제 장치 group을 확인하고 `dialout` 추가가 필요한지 판단한다.
+group 변경 후에는 WSL shell을 완전히 다시 열어 적용 여부를 확인한다.
+
+상위 제어기에는 micro-ROS Agent가 실제 설치되어 있어야 한다.
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 pkg prefix micro_ros_agent
+```
+
+패키지가 없다면 먼저 ROS apt repository 상태를 확인하고 제공되는 경우 다음을 사용한다.
+
+```bash
+sudo apt update
+apt-cache policy ros-humble-micro-ros-agent
+sudo apt install ros-humble-micro-ros-agent
+ros2 pkg prefix micro_ros_agent
+```
+
+apt package가 제공되지 않을 때만 공식 micro-ROS Humble source-build 절차를 사용한다.
+오래된 블로그 명령을 그대로 쓰지 말고 공식 `micro_ros_setup`의 `humble` branch를
+확인하며, `rosdep install`, `colcon build`, `ros2 pkg prefix micro_ros_agent`의 실제
+성공 결과를 남긴다.
+
+장치가 하나일 때도 먼저 실제 by-id 값을 출력한다. 여러 장치가 있으면 자동으로 첫
+장치를 고르지 말고 NUCLEO ST-LINK serial을 식별한다.
+
+```bash
+ls -l /dev/serial/by-id/
+```
+
+선택한 실제 경로로 Agent를 실행한다.
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/agv_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+unset ROS_NAMESPACE
+agent_dev='/dev/serial/by-id/<실제_STLINK_장치>'
+test -e "$agent_dev"
+ros2 run micro_ros_agent micro_ros_agent serial \
+  --dev "$agent_dev" -b 115200 -v6
+```
+
+Agent 로그에서 session/entity 생성이 확인된 다음, 별도 WSL 터미널에서 상위 제어기
+노드만 실행한다. `agv_sim` 프로세스가 없는지 먼저 확인한다.
+
+```bash
+ros2 node list
+pgrep -af 'wheel_simulator|agv_sim' || true
+ros2 run agv_control mecanum_controller
+```
+
+다른 WSL 터미널:
+
+```bash
+ros2 launch agv_odom mecanum_odometry.launch.py
+```
+
+VESC 전원 OFF 상태에서도 `/base_controller`와 topic/type/QoS가 보이는지 먼저
+확인한다. 이후 relay OFF 명령과 zero command를 확인한 다음에만 사용자 승인을 받고
+VESC 전원을 인가한다.
+
+```bash
+ros2 node info /base_controller
+ros2 topic info --verbose /wheel_commands
+ros2 topic info --verbose /wheel_states
+ros2 topic pub --once /relay_cmd std_msgs/msg/Bool "{data: false}"
+ros2 topic echo --qos-reliability best_effort /wheel_states
 ```
 
 가능하면 `/dev/serial/by-id/...`의 안정적인 경로로 Agent를 실행한다. 모든 ROS
