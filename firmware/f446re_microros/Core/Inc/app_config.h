@@ -43,7 +43,7 @@ static const int8_t wheel_directions[WHEEL_COUNT] = {1, -1, 1, -1};
 #define UART_TX_TIMEOUT_MS               100U
 
 #define RELAY_ACTIVE_LOW                 1U
-#define RELAY_DEFAULT_ENABLED            1U
+#define RELAY_DEFAULT_ENABLED            0U
 #define RELAY_STOP_MIN_CYCLES            3U
 #define RELAY_STOP_DELAY_MS              60U
 

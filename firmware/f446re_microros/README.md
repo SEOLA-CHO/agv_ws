@@ -105,6 +105,9 @@ wheel measurements rather than a single spatial frame.
 
 - Type: `std_msgs/msg/Bool`
 - QoS: Reliable/default
+- The active-low relay GPIO is initialized HIGH (OFF), and the relay defaults
+  to OFF after every STM32 boot or reset. It remains OFF until an explicit
+  `true` command is received.
 - `true`: turn the relay ON, invalidate the previous wheel command, and wait for
   a new `/wheel_commands` sample while continuing to send zero ERPM
 - `false`: enter `RELAY_STOPPING`, send zero ERPM for at least three motor-task

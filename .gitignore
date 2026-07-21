@@ -2,6 +2,7 @@
 build/
 install/
 log/
+_deps/
 
 # Python caches and test artifacts
 __pycache__/
@@ -29,3 +30,6 @@ Release/
 # ROS bags
 *.bag
 *.db3
+
+# Runtime mapping artifacts
+maps/

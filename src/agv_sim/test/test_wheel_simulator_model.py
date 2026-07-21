@@ -9,6 +9,7 @@ from agv_sim.wheel_simulator_model import (
 
 
 class TestWheelSimulatorModel(unittest.TestCase):
+
     def assert_vector_almost_equal(self, actual, expected):
         self.assertEqual(len(actual), len(expected))
         for actual_value, expected_value in zip(actual, expected):

@@ -7,6 +7,7 @@ from typing import Tuple
 from agv_msgs.msg import WheelCommands
 from geometry_msgs.msg import Twist
 import rclpy
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
 from rclpy.qos import ReliabilityPolicy
@@ -121,6 +122,9 @@ class MecanumController(Node):
 
     def publish_wheel_commands(self) -> None:
         """Publish at a fixed rate, including zeros after command timeout."""
+        if not rclpy.ok():
+            return
+
         now = self.get_clock().now()
         elapsed = (now - self.last_command_time).nanoseconds / 1e9
         stale = (
@@ -147,6 +151,9 @@ class MecanumController(Node):
 
     def publish_stop(self) -> None:
         """Best-effort final stop; the STM32 timeout remains authoritative."""
+        if not rclpy.ok():
+            return
+
         message = WheelCommands()
         message.velocity_rad_s = [0.0, 0.0, 0.0, 0.0]
         self.wheel_publisher.publish(message)
@@ -157,12 +164,14 @@ def main(args=None) -> None:
     node = MecanumController()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
-        node.publish_stop()
+        if rclpy.ok():
+            node.publish_stop()
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
