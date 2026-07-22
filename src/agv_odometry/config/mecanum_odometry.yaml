@@ -1,0 +1,16 @@
+mecanum_odometry:
+  ros__parameters:
+    wheel_radius: 0.0762
+    wheel_base: 0.445
+    wheel_track: 0.400
+
+    odom_frame: odom
+    base_frame: base_footprint
+    publish_tf: true
+    require_all_wheels_online: true
+    max_update_interval: 0.5
+
+    # Matches the rotation sign correction used by agv_control.
+    vx_direction: 1.0
+    vy_direction: 1.0
+    wz_direction: -1.0
