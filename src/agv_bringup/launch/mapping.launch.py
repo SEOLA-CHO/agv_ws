@@ -87,6 +87,20 @@ def _launch_components(context):
                     },
                 ],
             ),
+            Node(
+                package='agv_control',
+                executable='relative_motion_controller',
+                name='relative_motion_controller',
+                output='screen',
+                parameters=[
+                    _package_file(
+                        'agv_control',
+                        'config',
+                        'relative_motion_controller.yaml',
+                    ),
+                    {'use_sim_time': use_sim_time},
+                ],
+            ),
         ])
 
     if wheel_source == 'sim':

@@ -26,10 +26,17 @@ VESC CAN STATUS + STATUS_5
   -> /odom + odom -> base_footprint TF
 ```
 
+For measured relative moves, `agv_control/relative_motion_controller` accepts
+`agv_msgs/action/MoveRelative` goals on `/move_relative`, closes the loop with
+`/odom`, and publishes bounded `/cmd_vel` commands. The low-level mecanum
+controller remains velocity-only. See `src/agv_bringup/README.md` for the
+integrated launch and command examples.
+
 All wheel arrays use `[FL, FR, RL, RR]`. The controller and odometry packages
 use the same geometry: wheel radius 0.0762 m, wheel base 0.445 m, and wheel
-track 0.400 m. The rotation sign correction from the existing simulation
-branch is retained in both packages.
+track 0.400 m. Positive angular velocity follows the ROS convention and turns
+the physical platform counter-clockwise; command and odometry use the same
+sign.
 
 The controller publishes at 50 Hz with Best Effort QoS. It replaces stale or
 invalid `/cmd_vel` input with zeros and proportionally limits all wheel speeds

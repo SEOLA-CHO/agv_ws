@@ -1,0 +1,17 @@
+# Relative target in the robot frame captured when the goal starts.
+float64 x
+float64 y
+float64 yaw
+
+# Zero selects the server parameter default.
+float64 max_linear_speed
+float64 max_angular_speed
+float64 timeout
+---
+bool success
+string message
+float64 final_position_error
+float64 final_yaw_error
+---
+float64 remaining_distance
+float64 remaining_yaw

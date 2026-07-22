@@ -37,11 +37,11 @@ class TestKinematics(unittest.TestCase):
             [0.0, RADIUS, 0.0],
         )
 
-    def test_rotation_scale_matches_f446_controller_correction(self):
+    def test_positive_rotation_uses_ros_counter_clockwise_pattern(self):
         rotation_radius = 0.5 * (WHEELBASE_X + WHEELBASE_Y)
-        wheels = [1.0, -1.0, 1.0, -1.0]
+        wheels = [-1.0, 1.0, -1.0, 1.0]
         self.assert_velocity_almost_equal(
-            calculate(wheels, angular_z_scale=-1.0),
+            calculate(wheels, angular_z_scale=1.0),
             [0.0, 0.0, RADIUS / rotation_radius],
         )
 

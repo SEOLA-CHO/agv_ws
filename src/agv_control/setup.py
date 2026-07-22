@@ -37,6 +37,8 @@ setup(
         'console_scripts': [
             'mecanum_controller = '
             'agv_control.mecanum_controller:main',
+            'relative_motion_controller = '
+            'agv_control.relative_motion_controller:main',
         ],
     },
 )

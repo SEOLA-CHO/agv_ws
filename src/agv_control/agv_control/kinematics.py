@@ -1,7 +1,7 @@
 """Pure mecanum inverse-kinematics helpers."""
 
 import math
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 
 def inverse_mecanum(
@@ -13,6 +13,7 @@ def inverse_mecanum(
     wheel_track: float,
     rotation_direction: float = 1.0,
     max_wheel_speed: Optional[float] = None,
+    wheel_scales: Optional[Sequence[float]] = None,
 ) -> List[float]:
     """Return wheel rad/s in the fixed order [FL, FR, RL, RR]."""
     values = (
@@ -46,6 +47,16 @@ def inverse_mecanum(
         (vx + vy - lever_arm * corrected_wz) / wheel_radius,
         (vx - vy + lever_arm * corrected_wz) / wheel_radius,
     ]
+
+    if wheel_scales is not None:
+        if len(wheel_scales) != 4:
+            raise ValueError('wheel_scales must contain [FL, FR, RL, RR]')
+        scales = [float(scale) for scale in wheel_scales]
+        if not all(math.isfinite(scale) and scale > 0.0 for scale in scales):
+            raise ValueError('wheel_scales must be finite and positive')
+        wheel_speeds = [
+            speed * scale for speed, scale in zip(wheel_speeds, scales)
+        ]
 
     if max_wheel_speed is not None:
         peak_speed = max(abs(speed) for speed in wheel_speeds)

@@ -54,6 +54,10 @@ class MecanumOdometry(Node):
         self.declare_parameter('front_right_sign', 1.0)
         self.declare_parameter('rear_left_sign', 1.0)
         self.declare_parameter('rear_right_sign', 1.0)
+        self.declare_parameter('front_left_scale', 1.0)
+        self.declare_parameter('front_right_scale', 1.0)
+        self.declare_parameter('rear_left_scale', 1.0)
+        self.declare_parameter('rear_right_scale', 1.0)
         self.declare_parameter('require_all_wheels_online', True)
 
         self.declare_parameter('publish_tf', True)
@@ -65,7 +69,7 @@ class MecanumOdometry(Node):
 
         self.declare_parameter('linear_x_scale', 1.0)
         self.declare_parameter('linear_y_scale', 1.0)
-        self.declare_parameter('angular_z_scale', -1.0)
+        self.declare_parameter('angular_z_scale', 1.0)
 
         self.declare_parameter('initial_x', 0.0)
         self.declare_parameter('initial_y', 0.0)
@@ -108,6 +112,18 @@ class MecanumOdometry(Node):
         ]
         if not all(math.isfinite(value) and value != 0.0 for value in self.signs):
             raise ValueError('Wheel sign multipliers must be finite and non-zero')
+
+        self.wheel_scales = [
+            float(self.get_parameter('front_left_scale').value),
+            float(self.get_parameter('front_right_scale').value),
+            float(self.get_parameter('rear_left_scale').value),
+            float(self.get_parameter('rear_right_scale').value),
+        ]
+        if not all(
+            math.isfinite(value) and value > 0.0
+            for value in self.wheel_scales
+        ):
+            raise ValueError('Wheel scales must be finite and positive')
 
         self.require_all_wheels_online = bool(
             self.get_parameter('require_all_wheels_online').value
@@ -257,8 +273,10 @@ class MecanumOdometry(Node):
             return [0.0] * WHEEL_COUNT
 
         result = []
-        for raw_value, sign in zip(self.raw_wheels, self.signs):
-            value = raw_value * sign
+        for raw_value, sign, scale in zip(
+            self.raw_wheels, self.signs, self.wheel_scales
+        ):
+            value = raw_value * sign * scale
             if abs(value) < self.deadband:
                 value = 0.0
             result.append(value)

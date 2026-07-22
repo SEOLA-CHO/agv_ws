@@ -4,6 +4,7 @@
 import math
 from typing import Tuple
 
+from agv_control.kinematics import inverse_mecanum
 from agv_msgs.msg import WheelCommands
 from geometry_msgs.msg import Twist
 import rclpy
@@ -11,8 +12,6 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile
 from rclpy.qos import ReliabilityPolicy
-
-from agv_control.kinematics import inverse_mecanum
 
 
 class MecanumController(Node):
@@ -27,7 +26,11 @@ class MecanumController(Node):
         self.declare_parameter('max_wheel_speed', 16.36)
         self.declare_parameter('command_timeout', 0.5)
         self.declare_parameter('publish_rate', 50.0)
-        self.declare_parameter('rotation_direction', -1.0)
+        self.declare_parameter('rotation_direction', 1.0)
+        self.declare_parameter('front_left_scale', 1.0)
+        self.declare_parameter('front_right_scale', 1.0)
+        self.declare_parameter('rear_left_scale', 1.0)
+        self.declare_parameter('rear_right_scale', 1.0)
 
         self.wheel_radius = float(self.get_parameter('wheel_radius').value)
         self.wheel_base = float(self.get_parameter('wheel_base').value)
@@ -42,6 +45,12 @@ class MecanumController(Node):
         self.rotation_direction = float(
             self.get_parameter('rotation_direction').value
         )
+        self.wheel_scales = [
+            float(self.get_parameter('front_left_scale').value),
+            float(self.get_parameter('front_right_scale').value),
+            float(self.get_parameter('rear_left_scale').value),
+            float(self.get_parameter('rear_right_scale').value),
+        ]
         self._validate_parameters()
 
         self.latest_command: Tuple[float, float, float] = (0.0, 0.0, 0.0)
@@ -101,6 +110,11 @@ class MecanumController(Node):
             )
         if self.rotation_direction == 0.0:
             raise ValueError('rotation_direction must be non-zero')
+        if not all(
+            math.isfinite(scale) and scale > 0.0
+            for scale in self.wheel_scales
+        ):
+            raise ValueError('Wheel scales must be finite and positive')
 
     def cmd_vel_callback(self, message: Twist) -> None:
         """Store only finite body-velocity commands."""
@@ -143,6 +157,7 @@ class MecanumController(Node):
             wheel_track=self.wheel_track,
             rotation_direction=self.rotation_direction,
             max_wheel_speed=self.max_wheel_speed,
+            wheel_scales=self.wheel_scales,
         )
 
         message = WheelCommands()

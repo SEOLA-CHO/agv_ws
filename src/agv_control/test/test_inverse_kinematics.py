@@ -41,12 +41,12 @@ class TestInverseKinematics(unittest.TestCase):
             [-speed, speed, speed, -speed],
         )
 
-    def test_rotation_direction_matches_existing_robot_configuration(self):
+    def test_positive_rotation_uses_ros_counter_clockwise_pattern(self):
         lever_arm = 0.5 * (BASE + TRACK)
         speed = lever_arm / RADIUS
         self.assert_wheels_almost_equal(
-            calculate(wz=1.0, rotation_direction=-1.0),
-            [speed, -speed, speed, -speed],
+            calculate(wz=1.0, rotation_direction=1.0),
+            [-speed, speed, -speed, speed],
         )
 
     def test_limit_scales_all_wheels_proportionally(self):
@@ -63,6 +63,31 @@ class TestInverseKinematics(unittest.TestCase):
             [value * scale for value in unrestricted],
         )
         self.assertAlmostEqual(max(abs(value) for value in limited), 10.0)
+
+    def test_wheel_scales_are_applied_before_speed_limit(self):
+        scaled = calculate(
+            vx=1.0,
+            wheel_scales=[1.01, 0.99, 1.01, 0.99],
+        )
+        base_speed = 1.0 / RADIUS
+        self.assert_wheels_almost_equal(
+            scaled,
+            [base_speed * 1.01, base_speed * 0.99,
+             base_speed * 1.01, base_speed * 0.99],
+        )
+
+        limited = calculate(
+            vx=1.0,
+            wheel_scales=[1.01, 0.99, 1.01, 0.99],
+            max_wheel_speed=10.0,
+        )
+        self.assertAlmostEqual(max(abs(value) for value in limited), 10.0)
+
+    def test_invalid_wheel_scales_are_rejected(self):
+        with self.assertRaises(ValueError):
+            calculate(vx=1.0, wheel_scales=[1.0, 1.0])
+        with self.assertRaises(ValueError):
+            calculate(vx=1.0, wheel_scales=[1.0, 0.0, 1.0, 1.0])
 
     def test_non_finite_command_is_rejected(self):
         with self.assertRaises(ValueError):
