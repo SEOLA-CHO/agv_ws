@@ -8,9 +8,15 @@ Source the runtime overlays before launching:
 ```bash
 source /opt/ros/humble/setup.bash
 source _deps/sllidar_ws/install/setup.bash
-source _deps/microros_ws/install/local_setup.bash
+test ! -f _deps/microros_ws/install/local_setup.bash || \
+  source _deps/microros_ws/install/local_setup.bash
 source install/setup.bash
+ros2 pkg prefix micro_ros_agent
 ```
+
+The micro-ROS Agent is a required PC dependency for `wheel_source:=hardware`.
+It may be installed through the ROS apt repository or built under
+`_deps/microros_ws`; see the workspace root `README.md` for both procedures.
 
 ## Simulation
 

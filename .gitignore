@@ -31,5 +31,9 @@ Release/
 *.bag
 *.db3
 
-# Runtime mapping artifacts
-maps/
+# Runtime mapping artifacts. Keep only the team-approved v4 map in Git.
+maps/*
+!maps/agv_map_v4.yaml
+!maps/agv_map_v4.pgm
+!maps/agv_map_v4.posegraph
+!maps/agv_map_v4.data

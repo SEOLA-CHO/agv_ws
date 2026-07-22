@@ -48,6 +48,50 @@ Odometry consumes only robot-coordinate `velocity_rad_s` from
 wheel is offline or a sample is invalid. A synchronized STM32 header timestamp
 is used when available, with ROS receipt time as the zero-stamp fallback.
 
+## PC dependencies, including the micro-ROS Agent
+
+The PC running hardware mode must have the `micro_ros_agent` package. Check
+for it after sourcing ROS 2:
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 pkg prefix micro_ros_agent
+```
+
+If the package is available from the configured ROS apt repository, install it
+with:
+
+```bash
+sudo apt update
+apt-cache policy ros-humble-micro-ros-agent
+sudo apt install ros-humble-micro-ros-agent
+```
+
+If apt does not provide that package, build the official Humble Agent in the
+workspace-local dependency directory used by this repository:
+
+```bash
+cd ~/agv_ws
+mkdir -p _deps/microros_ws/src
+git clone -b humble https://github.com/micro-ROS/micro_ros_setup.git \
+  _deps/microros_ws/src/micro_ros_setup
+
+cd _deps/microros_ws
+source /opt/ros/humble/setup.bash
+rosdep update
+rosdep install --from-paths src --ignore-src -y
+colcon build --symlink-install
+source install/local_setup.bash
+ros2 run micro_ros_setup create_agent_ws.sh
+ros2 run micro_ros_setup build_agent.sh
+source install/local_setup.bash
+ros2 pkg prefix micro_ros_agent
+```
+
+Only one of the apt or source-build methods is required. The `_deps/`
+directory is intentionally not stored in Git, so every new PC must install the
+Agent dependency locally.
+
 ## Build
 
 On Ubuntu 22.04 with ROS 2 Humble:
@@ -58,6 +102,15 @@ colcon build --symlink-install \
   --packages-select agv_msgs agv_control agv_odometry
 source install/setup.bash
 ```
+
+## Included map
+
+The repository contains only the approved v4 map under `maps/`:
+
+- `agv_map_v4.yaml` and `agv_map_v4.pgm` for static map display/navigation
+- `agv_map_v4.posegraph` and `agv_map_v4.data` for SLAM Toolbox map reload
+
+The large ZIP archives and older map versions are intentionally excluded.
 
 ## Run the PC nodes
 
