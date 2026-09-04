@@ -13,8 +13,8 @@ mecanum_controller:
     rotation_direction: 1.0
 
     # 10 m hardware calibration, order=[FL, FR, RL, RR].
-    # Counteracts the measured constant counter-clockwise path curvature.
-    front_left_scale: 1.0064
-    front_right_scale: 0.9936
-    rear_left_scale: 1.0064
-    rear_right_scale: 0.9936
+    # Interpolated between a 0.12 m right drift and a 0.15 m left drift.
+    front_left_scale: 1.0061
+    front_right_scale: 0.9939
+    rear_left_scale: 1.0061
+    rear_right_scale: 0.9939

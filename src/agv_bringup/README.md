@@ -42,6 +42,30 @@ The fixed frames are `map`, `odom`, `base_footprint`, `base_link`, and
 Hardware mode rejects a missing Agent device, and simulation mode never starts
 the micro-ROS Agent.
 
+## Navigation with the saved v4 map
+
+The navigation launch starts the hardware pipeline, AMCL localization, Nav2,
+and RViz. It loads `maps/agv_map_v4.yaml` by default. Discover stable serial
+paths first, then launch with the drive wheels clear of people and obstacles:
+
+```bash
+ls -l /dev/serial/by-id/
+ros2 launch agv_bringup navigation.launch.py \
+  agent_device:=/dev/serial/by-id/<stm32> \
+  lidar_device:=/dev/serial/by-id/<lidar>
+```
+
+In RViz, use **2D Pose Estimate** to set the robot's current pose on the map.
+Confirm that the laser scan lines up with walls and that the `map -> odom ->
+base_footprint -> base_link -> laser_frame` TF chain is healthy. Then use
+**Nav2 Goal** to send a nearby, unobstructed goal. Keep the relay/emergency stop
+within reach during the first hardware tests.
+
+The initial Nav2 limits are deliberately conservative: 0.20 m/s translation
+and 0.50 rad/s rotation. The rectangular footprint is the modeled body size
+(0.70 x 0.56 m), and the local planner is configured for holonomic mecanum
+motion. Override `map:=/absolute/path/to/map.yaml` when using another map.
+
 ## Odometry-closed-loop relative motion
 
 Whenever `wheel_source` is `sim` or `hardware`, the launch also starts the

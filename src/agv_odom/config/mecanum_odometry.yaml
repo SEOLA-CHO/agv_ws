@@ -15,10 +15,10 @@ mecanum_odometry:
     rear_left_sign: 1.0
     rear_right_sign: 1.0
     # Effective rolling-radius scales paired with controller wheel trims.
-    front_left_scale: 0.9936
-    front_right_scale: 1.0064
-    rear_left_scale: 0.9936
-    rear_right_scale: 1.0064
+    front_left_scale: 0.9939
+    front_right_scale: 1.0061
+    rear_left_scale: 0.9939
+    rear_right_scale: 1.0061
     require_all_wheels_online: true
 
     publish_tf: true
@@ -29,6 +29,7 @@ mecanum_odometry:
     maximum_dt: 0.1
 
     # 9.904 m measured path / 10.010 m recorded odometry.
+    # Do not calibrate this value from a MoveRelative run that timed out.
     linear_x_scale: 0.9894
     linear_y_scale: 1.0
     # ROS convention: positive angular.z is counter-clockwise.

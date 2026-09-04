@@ -2,7 +2,8 @@ relative_motion_controller:
   ros__parameters:
     control_rate: 20.0
     odom_timeout: 0.2
-    default_goal_timeout: 30.0
+    # Allows low-speed 10 m calibration runs to finish without timing out.
+    default_goal_timeout: 150.0
 
     default_max_linear_speed: 0.20
     default_max_angular_speed: 0.40
